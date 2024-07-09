@@ -17,15 +17,6 @@ struct AnimationIndices {
     last: usize,
 }
 
-#[derive(Component)]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-    Neutral,
-}
-
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
 
@@ -68,35 +59,38 @@ fn setup(
         },
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Direction::Up,
     ));
 }
 
-fn movement(time: Res<Time>, mut sprite_position: Query<(&mut Direction, &mut Transform, &mut AnimationTimer)>, keyboard_input: Res<ButtonInput<KeyCode>>) {
-    for (mut logo, mut transform, mut animation_timer) in &mut sprite_position {
-        match *logo {
-            Direction::Up => {transform.translation.y += 150. * time.delta_seconds(); animation_timer.0.unpause()},
-            Direction::Down => {transform.translation.y -= 150. * time.delta_seconds(); animation_timer.0.unpause()},
-            Direction::Left => {transform.translation.x -= 150. * time.delta_seconds(); animation_timer.0.unpause()},
-            Direction::Right => {transform.translation.x += 150. * time.delta_seconds(); animation_timer.0.unpause()},
-            Direction::Neutral => animation_timer.0.pause(),
-
-
-
-        }
+fn movement(
+    time: Res<Time>,
+    mut sprite_position: Query<(&mut Transform, &mut AnimationTimer)>,
+    keyboard_input: Res<ButtonInput<KeyCode>>
+) {
+    for (mut transform, mut animation_timer) in &mut sprite_position {
 
         if keyboard_input.pressed(KeyCode::KeyS) {
-            *logo = Direction::Down;
-        } else if keyboard_input.pressed(KeyCode::KeyW) {
-            *logo = Direction::Up;
-        } else if keyboard_input.pressed(KeyCode::KeyA) {
-            *logo = Direction::Left;
-        } else if keyboard_input.pressed(KeyCode::KeyD) {
-            *logo = Direction::Right;
-        } else {
-            *logo = Direction::Neutral;
+            transform.translation.y -= 150. * time.delta_seconds();
+            animation_timer.0.unpause();
+        } if keyboard_input.pressed(KeyCode::KeyW) {
+            transform.translation.y += 150. * time.delta_seconds();
+            animation_timer.0.unpause();
+        } if keyboard_input.pressed(KeyCode::KeyA) {
+            transform.translation.x -= 150. * time.delta_seconds();
+            transform.scale.x = -6.0; // Flip the sprite horizontally
+            animation_timer.0.unpause();
+        } if keyboard_input.pressed(KeyCode::KeyD) {
+            transform.translation.x += 150. * time.delta_seconds();
+            animation_timer.0.unpause();
+            transform.scale.x = 6.0; // Flip the sprite horizontally
+        }
 
+        if !keyboard_input.pressed(KeyCode::KeyS) &&
+        !keyboard_input.pressed(KeyCode::KeyW) &&
+        !keyboard_input.pressed(KeyCode::KeyA) &&
+        !keyboard_input.pressed(KeyCode::KeyD) {
+            animation_timer.0.pause()
+     }
         }
     }
 
-}
