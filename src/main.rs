@@ -4,7 +4,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
         .add_systems(Startup, setup)
-        .add_systems(Update, (animate_sprite,movement))
+        .add_systems(Update, (animate_sprite,jump, movement).chain())
         .run();
 }
 
@@ -14,7 +14,7 @@ struct AnimationIndices {
     last: usize,
 }
 
-#[derive(Component, PartialEq, Eq, Copy)]
+#[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
 enum PlayerState {
     Running,
     Neutral,
@@ -30,8 +30,12 @@ fn animate_sprite(
 ) {
     for (indices, mut timer, mut atlas) in &mut query {
         timer.tick(time.delta());
+        println!("{} {} {}", atlas.index, indices.first, indices.last);
+        if atlas.index < indices.first {
+            atlas.index = indices.first
+        }
         if timer.just_finished() {
-            atlas.index = if atlas.index == indices.last {
+            atlas.index = if atlas.index >= indices.last {
                 indices.first
             } else {
                 atlas.index + 1
@@ -73,41 +77,51 @@ fn movement(
     keyboard_input: Res<ButtonInput<KeyCode>>
 ) {
     for (mut transform, mut animation_timer, mut animation_indices, mut player_state) in &mut sprite_position {
+        println!("{:?}", player_state);
+        if *player_state == PlayerState::Neutral {
+            animation_timer.0.pause();
+        } else {
+            animation_timer.0.unpause();
+        }
         if keyboard_input.pressed(KeyCode::KeyA) {
+            *player_state = PlayerState::Running;
             animation_indices.first = 0;
             animation_indices.last = 5;
-            *player_state = PlayerState::Running;
             transform.translation.x -= 150. * time.delta_seconds();
             transform.scale.x = -6.0; // Flip the sprite horizontally
-            animation_timer.0.unpause();
         } if keyboard_input.pressed(KeyCode::KeyD) {
+            *player_state = PlayerState::Running;
             animation_indices.first = 0;
             animation_indices.last = 5;
-            *player_state = PlayerState::Running;
             transform.translation.x += 150. * time.delta_seconds();
-            animation_timer.0.unpause();
             transform.scale.x = 6.0; // Flip the sprite horizontally
-        } if keyboard_input.pressed(KeyCode::Space) {
-            jump(time, &mut transform, &mut animation_timer, &mut animation_indices, player_state);
-        } if !keyboard_input.pressed(KeyCode::KeyA) && !keyboard_input.pressed(KeyCode::KeyD) || (keyboard_input.pressed(KeyCode::KeyD) && keyboard_input.pressed(KeyCode::KeyA)){
+        } if !keyboard_input.pressed(KeyCode::KeyA) && !keyboard_input.pressed(KeyCode::KeyD) {
             *player_state = PlayerState::Neutral;
         }
 
-        if *player_state == PlayerState::Neutral {
-            animation_timer.0.pause();
-        }
     }
 }
 
 fn jump(
     time: Res<Time>,
-    mut query: Query<(&mut Transform, &mut AnimationTimer, &mut AnimationIndices, &mut PlayerState)>,
+    mut sprite_position: Query<(&mut Transform, &mut AnimationIndices, &mut PlayerState)>,
+    keyboard_input: Res<ButtonInput<KeyCode>>
 ) {
-    for (mut transform, mut animation_timer, mut animation_indices, mut player_state) in query.iter_mut() {
+    for (mut transform, mut animation_indices, mut player_state) in &mut sprite_position {
+        if keyboard_input.pressed(KeyCode::Space) {
+        *player_state = PlayerState::Jumping;
         transform.translation.y += 200. * time.delta_seconds();
         animation_indices.first = 6;
         animation_indices.last = 11;
+
+    }
+    if keyboard_input.pressed(KeyCode::KeyS) {
         *player_state = PlayerState::Jumping;
-        animation_timer.0.reset();
-        animation_timer.0.unpause();    }
+        transform.translation.y -= 200. * time.delta_seconds();
+        animation_indices.first = 6;
+        animation_indices.last = 11;
+
+    }
+    }
+    
 }
