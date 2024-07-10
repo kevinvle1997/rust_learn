@@ -8,7 +8,7 @@ fn main() {
         .run();
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 struct AnimationIndices {
     first: usize,
     last: usize,
@@ -61,18 +61,12 @@ fn setup(
 
 fn movement(
     time: Res<Time>,
-    mut sprite_position: Query<(&mut Transform, &mut AnimationTimer)>,
+    mut sprite_position: Query<(&mut Transform, &mut AnimationTimer, &mut AnimationIndices)>,
     keyboard_input: Res<ButtonInput<KeyCode>>
 ) {
-    for (mut transform, mut animation_timer) in &mut sprite_position {
-
-        if keyboard_input.pressed(KeyCode::KeyS) {
-            transform.translation.y -= 150. * time.delta_seconds();
-            animation_timer.0.unpause();
-        } if keyboard_input.pressed(KeyCode::KeyW) {
-            transform.translation.y += 150. * time.delta_seconds();
-            animation_timer.0.unpause();
-        } if keyboard_input.pressed(KeyCode::KeyA) {
+    for (mut transform, mut animation_timer, mut animation_indices) in &mut sprite_position {
+        println!("Animation indices: {:?}", animation_indices);
+        if keyboard_input.pressed(KeyCode::KeyA) {
             transform.translation.x -= 150. * time.delta_seconds();
             transform.scale.x = -6.0; // Flip the sprite horizontally
             animation_timer.0.unpause();
@@ -80,14 +74,12 @@ fn movement(
             transform.translation.x += 150. * time.delta_seconds();
             animation_timer.0.unpause();
             transform.scale.x = 6.0; // Flip the sprite horizontally
-        }
-
-        if !keyboard_input.pressed(KeyCode::KeyS) &&
-        !keyboard_input.pressed(KeyCode::KeyW) &&
-        !keyboard_input.pressed(KeyCode::KeyA) &&
-        !keyboard_input.pressed(KeyCode::KeyD) {
-            animation_timer.0.pause()
-     }
+        } if keyboard_input.pressed(KeyCode::Space) {
+            animation_indices.first = 0;
+            animation_indices.last = 2;
+        } if !keyboard_input.pressed(KeyCode::KeyA) && !keyboard_input.pressed(KeyCode::KeyD) || (keyboard_input.pressed(KeyCode::KeyD) && keyboard_input.pressed(KeyCode::KeyA)){
+            animation_timer.0.pause();
         }
     }
+}
 
