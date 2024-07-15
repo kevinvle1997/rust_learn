@@ -5,13 +5,17 @@ fn main() {
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
         .init_resource::<Gravity>()
         .add_systems(Startup, setup)
-        .add_systems(Update, (
-            animate_sprite,
-            apply_gravity,
-            handle_player_ground_collision,
-            jump,
-            movement
-        ).chain())
+        .add_systems(
+            Update,
+            (
+                animate_sprite,
+                apply_gravity,
+                handle_player_ground_collision,
+                jump,
+                movement,
+            )
+                .chain(),
+        )
         .run();
 }
 
@@ -28,8 +32,24 @@ enum PlayerState {
     Jumping,
 }
 
-#[derive(Component, Deref, DerefMut)]
+impl PlayerState {
+    fn animation_type(&self) -> AnimationType {
+        match self {
+            PlayerState::Running => AnimationType::Repeat,
+            PlayerState::Neutral => AnimationType::Single,
+            PlayerState::Jumping => AnimationType::Single,
+        }
+    }
+}
+
+#[derive(Component, Deref, DerefMut, Debug)]
 struct AnimationTimer(Timer);
+
+#[derive(Component)]
+enum AnimationType {
+    Single,
+    Repeat,
+}
 
 #[derive(Component, Default)]
 struct Velocity(Vec2);
@@ -48,19 +68,33 @@ impl Default for Gravity {
 
 fn animate_sprite(
     time: Res<Time>,
-    mut query: Query<(&AnimationIndices, &mut AnimationTimer, &mut TextureAtlas)>,
+    mut query: Query<(
+        &AnimationIndices,
+        &mut AnimationTimer,
+        &mut TextureAtlas,
+        &PlayerState,
+    )>,
 ) {
-    for (indices, mut timer, mut atlas) in &mut query {
+    for (indices, mut timer, mut atlas, player_state) in &mut query {
         timer.tick(time.delta());
         if atlas.index < indices.first {
             atlas.index = indices.first
         }
         if timer.just_finished() {
-            atlas.index = if atlas.index >= indices.last {
-                indices.first
-            } else {
-                atlas.index + 1
-            };
+            match player_state.animation_type() {
+                AnimationType::Repeat => {
+                    atlas.index = if atlas.index >= indices.last {
+                        indices.first
+                    } else {
+                        atlas.index + 1
+                    };
+                }
+                AnimationType::Single => {
+                    if atlas.index < indices.last {
+                        atlas.index += 1;
+                    }
+                }
+            }
         }
     }
 }
@@ -96,10 +130,21 @@ fn setup(
 
 fn movement(
     time: Res<Time>,
-    mut query: Query<(&mut Transform, &mut AnimationTimer, &mut AnimationIndices, &mut PlayerState), With<Player>>,
+    mut query: Query<
+        (
+            &mut Transform,
+            &mut AnimationTimer,
+            &mut AnimationIndices,
+            &mut PlayerState,
+        ),
+        With<Player>,
+    >,
     keyboard_input: Res<ButtonInput<KeyCode>>,
 ) {
-    for (mut transform, mut animation_timer, mut animation_indices, mut player_state) in query.iter_mut() {
+    for (mut transform, mut animation_timer, mut animation_indices, mut player_state) in
+        query.iter_mut()
+    {
+        println!("{:?}", animation_timer.0);
         if *player_state != PlayerState::Jumping {
             if keyboard_input.pressed(KeyCode::KeyA) {
                 *player_state = PlayerState::Running;
@@ -119,16 +164,34 @@ fn movement(
                 *player_state = PlayerState::Neutral;
                 animation_timer.0.pause();
             }
+        } else {
+            animation_timer.0.unpause();
         }
     }
 }
 
 fn jump(
-    mut query: Query<(&mut Velocity, &mut AnimationIndices, &mut PlayerState), With<Player>>,
+    mut query: Query<(
+        &mut Velocity,
+        &mut AnimationIndices,
+        &mut PlayerState,
+        &mut AnimationTimer,
+        &mut TextureAtlas,
+    )>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
 ) {
-    for (mut velocity, mut animation_indices, mut player_state) in query.iter_mut() {
+    for (
+        mut velocity,
+        mut animation_indices,
+        mut player_state,
+        mut animation_timer,
+        mut texture_atlas,
+    ) in query.iter_mut()
+    {
         if keyboard_input.just_pressed(KeyCode::Space) && *player_state != PlayerState::Jumping {
+            animation_timer.0.reset();
+            animation_timer.0.unpause();
+            texture_atlas.index = 6;
             *player_state = PlayerState::Jumping;
             velocity.0.y = 300.0; // Adjust this value to change jump strength
             animation_indices.first = 6;
